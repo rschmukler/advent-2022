@@ -1,3 +1,5 @@
 {:paths ["src" "test"]
  :deps
- {org.clojure/core.match {:mvn/version "1.0.0"}}}
+ {org.clojure/core.match {:mvn/version "1.0.0"}
+  teknql/wing {:git/url "https://github.com/teknql/wing"
+               :git/sha "c26ea89255d2d047e69f0132e6bbba5e3143c02d"}}}
