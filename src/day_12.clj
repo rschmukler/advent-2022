@@ -30,15 +30,18 @@
                   (when (<= (- new-elevation elevation) 1)
                     %))))))
 
-(defn minimum-cost
+(defn shortest-path-dj
   "Dijkstra's cost algo"
   [m starts end]
-  (loop [queue  (into clojure.lang.PersistentQueue/EMPTY starts)
-         ->min-cost (into {} (map (juxt identity (constantly 0))) starts)
+  (loop [queue   (into clojure.lang.PersistentQueue/EMPTY starts)
+         state   (into {} (map (juxt identity (constantly {:cost 0}))) starts)
          visited #{}]
     (let [node (peek queue)]
       (if (= end node)
-        (->min-cost node)
+        (->> (iterate (comp :via state) node)
+             (take-while some?)
+             (reverse)
+             (rest))
         (let [neighbors (->> (possible-moves m node)
                              (remove
                                (some-fn (set queue)
@@ -46,10 +49,56 @@
           (recur
             (reduce conj (pop queue) neighbors)
             (reduce
-              #(update %1 %2 (fnil min ##Inf) (inc (->min-cost node)))
-              ->min-cost
+              (fn [state neighbor]
+                (let [new-cost (inc (:cost (state node)))]
+                  (if (< new-cost (:cost (state neighbor) ##Inf))
+                    (assoc state neighbor {:cost new-cost :via node})
+                    state)))
+              state
               neighbors)
             (conj visited node)))))))
+
+(defn pythagoras-dist
+  "Return the pythagoras distance between two points"
+  [[ya xa] [yb xb]]
+  (let [y-dist (abs (- ya yb))
+        x-dist (abs (- xa xb))]
+    (Math/sqrt (+ (* y-dist y-dist) (* x-dist x-dist)))))
+
+(defn shortest-path-a*
+  "Shortest path via a*"
+  [m start end]
+  (let [f-cost (fn f-cost [node]
+                 (let [g-cost (pythagoras-dist node start)
+                       h-cost (pythagoras-dist node end)]
+                   (+ g-cost h-cost)))]
+    (loop [queue   #{start}
+           visited #{}
+           state   (into {} [start {:cost (f-cost start)}])]
+      (let [node (first (sort-by (comp :cost state) queue))]
+        (cond
+          (nil? node)  nil
+          (= end node) (->> (iterate (comp :via state) node)
+                            (take-while (every-pred some?
+                                                    #(not= start %)))
+                            reverse)
+          :else
+          (let [neighbors (possible-moves m node)
+                state
+                (reduce
+                  (fn keep-lowest-f-cost [state neighbor]
+                    (let [f-cost        (f-cost neighbor)
+                          existing-cost (get-in state [neighbor :cost] ##Inf)]
+                      (if (< f-cost existing-cost)
+                        (assoc state neighbor
+                               {:cost f-cost :via node})
+                        state)))
+                  state
+                  neighbors)]
+            (recur
+              (into (disj queue node) (remove visited) neighbors)
+              (conj visited node)
+              state)))))))
 
 (defn solve-part-one
   "Solve part one"
@@ -63,7 +112,7 @@
                    (keys)
                    (filter #(= \E (m %)))
                    first)]
-    (minimum-cost m [start] end)))
+    (count (shortest-path-a* m start end))))
 
 (defn solve-part-two
   [input]
@@ -75,13 +124,10 @@
         starts (->> m
                     (keys)
                     (filter (comp zero? char->elevation m)))]
-    (minimum-cost m starts end)))
+    (count (shortest-path-dj m starts end))))
 
 
 (comment
-  (possible-moves (input->map
-                    (slurp "resources/day_12.txt"))
-                  [21 0])
   (solve-part-one (slurp "resources/day_12.txt"))
   (solve-part-two (slurp "resources/day_12.txt"))
   )
