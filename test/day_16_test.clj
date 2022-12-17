@@ -13,8 +13,8 @@
          (sut/line->valve "Valve AA has flow rate=0; tunnels lead to valves DD, II, BB"))))
 
 
-(deftest expected-values-test
-  (is (= ["DD" 1651]
-         (-> sample-valves
-             (sut/expected-values "AA" 30)
-             first))))
+(deftest expected-value-test
+  (is (= 1651 (sut/expected-value sample-valves "AA" 30))))
+
+(deftest expected-value-part-2-test
+  (is (= 1707 (sut/expected-value-part-2 sample-valves ["AA" "AA"] [26 26]))))

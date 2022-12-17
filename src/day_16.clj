@@ -54,7 +54,7 @@
   (-> (into {} (map (comp (juxt :valve identity) line->valve)) (str/split-lines input))
       (enrich-with-travel-times)))
 
-(defn expected-values
+(defn expected-value
   "Return the expected values of nodes in `m`, sorted descending"
   [m current-node-id mins-remaining]
   (->> (vals m)
@@ -67,19 +67,89 @@
                  open-time      1
                  remaining-time (- mins-remaining travel-time open-time)]
              (when (pos? remaining-time)
-               [valve (+ (* remaining-time flow-rate)
-                         (-> (expected-values
-                               (assoc-in m [valve :open] true)
-                               valve
-                               remaining-time)
-                             first
-                             second
-                             (or 0)))]))))
-       (sort-by second >)))
+               (+ (* remaining-time flow-rate)
+                  (-> (expected-value
+                        (assoc-in m [valve :open] true)
+                        valve
+                        remaining-time)
+                      (or 0)))))))
+       (apply max 0)))
+
+(def expected-values-part-2
+  "Return the expected values of nodes in `m`, sorted descending"
+  (memoize
+    (fn [m [me el] [my-mins-remaining el-mins-remaining]]
+      (let [valves-we-could-open-next (->> (vals m)
+                                           (remove
+                                             (some-fn
+                                               :open
+                                               (comp zero? :flow-rate))))]
+        (apply
+          max
+          0
+          (for [my-next valves-we-could-open-next
+                el-next valves-we-could-open-next
+                :when   (not= my-next el-next)
+                :let    [my-travel-time (get-in m [me :travel-time my-next])
+                         el-travel-time (get-in m [el :travel-time el-next])
+                         my-rem-time    (dec (- my-mins-remaining my-travel-time))
+                         el-rem-time    (dec (- el-mins-remaining el-travel-time))
+                         new-state      (-> m
+                                            (assoc-in [my-next :open] true)
+                                            (assoc-in [el-next :open] true))
+                         my-valve       (m my-next)
+                         el-valve       (m el-next)]]
+            (+ (if-not (pos? my-rem-time)
+                 0
+                 (* my-rem-time (:flow-rate my-valve)))
+               (if-not (pos? el-rem-time)
+                 0
+                 (* el-rem-time (:flow-rate el-valve)))
+               (expected-values-part-2 new-state [my-next el-next] [my-rem-time el-rem-time]))))))))
+
+#_(def expected-value
+    (memoize
+      (fn [m current-node mins-remaining]
+        (let [{:keys [leads-to flow-rate open]} (m current-node)]
+          (cond
+            (not (pos? mins-remaining)) 0
+            (or open (zero? flow-rate))
+            (->> leads-to
+                 (map #(expected-value m % (dec mins-remaining)))
+                 (apply max))
+            :else
+            (let [val-if-we-dont-open
+                  (->>  leads-to
+                        (map #(expected-value m % (dec mins-remaining)))
+                        (apply max))
+                  val-if-we-do-open
+                  (->>  leads-to
+                        (map #(expected-value (assoc-in m [current-node :open] true) % (- mins-remaining 2)))
+                        (apply max)
+                        (+ (* flow-rate (dec mins-remaining))))]
+              (max val-if-we-do-open val-if-we-dont-open)))))))
+
+#_(def expected-value-part-two
+    (memoize
+      (fn [m [me el] mins-remaining]
+        (let [me-valve (m me)
+              el-valve (m el)]
+          (cond
+            (not (pos? mins-remaining)) 0
+            ()
+            ))
+        )))
 
 (comment
-  (-> (slurp "resources/day_16.txt")
-      (input->valves)
-      (expected-values "AA" 30)
-      first)
+  (time
+    (-> (slurp "resources/day_16.txt")
+        (input->valves)
+        (expected-value "AA" 30)))
+
+  (time
+    (-> (slurp "resources/day_16.txt")
+        (input->valves)
+        (expected-value-part-2 ["AA" "AA"] [26 26])))
+
+  ()
   )
