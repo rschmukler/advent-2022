@@ -63,6 +63,14 @@
             (into seen-xs new-xs)
             (into result coords-at-y)))))))
 
+(defn normalize-top
+  "Take coordinates in `coords` and return them normalized to relative heights"
+  [coords]
+  (let [min-y (apply min (map second coords))]
+    (set
+      (for [[x y] coords]
+        [x (- y (dec min-y))]))))
+
 (defn place-rock
   "Simulate one rock falling and return the new state"
   [{:keys [m stream rock-shapes]}]
@@ -111,40 +119,41 @@
   (inc (apply max 0 (map second m))))
 
 (defn find-cycle
+  "Given a sequence of items, attempts to find a cycle"
   [items]
-  (let [items (rest items)]
-    (loop [offset 1
-           s      (rest items)]
+  (let [items (vec items)]
+    (loop [n 10]
       (cond
-        (= (take 20 s)
-           (take 20 items)) offset
-        (> offset 100000)   nil
+        (= n (count items)) nil
+        (= (take-last n items)
+           (take n (take-last (* 2 n) items)))
+        n
         :else
-        (recur (inc offset) (rest s))))))
+        (recur (inc n))))))
 
 (defn quick-compute-height-at-level
   "Optimized height computation"
   [n stream]
-  (let [height-seq  (->> (rock-placements stream)
+  (let [rocks       (->> (rock-placements stream)
                          (rest)
-                         (map height))
-        sample-size (->> height-seq
-                         (partition 2 1)
-                         (map #(- (second %) (first %)))
+                         (take 5000))
+        height-seq  (map height rocks)
+        sample-size (->> rocks
+                         (map normalize-top)
                          find-cycle)
-        sample-quot (quot n sample-size)
         sample-rem  (rem n sample-size)
-        _           (do (println "Big Sample size:" sample-size)
-                        (println "Big sample quot:" sample-quot)
-                        (println "Big sample rem:" sample-rem))]
-    (println (nth height-seq sample-size))
-    (+
-      (* sample-quot
-         (nth height-seq sample-size))
-      (-> height-seq
-          (nth (dec sample-rem))))))
+        sample-quot (quot n sample-size)]
+    (+ (* sample-quot
+          (->> height-seq
+               (partition 2 1)
+               (take-last sample-size)
+               (map #(- (second %) (first %)))
+               (apply +)))
+       (-> height-seq
+           (nth (dec sample-rem))))))
 
 (defn print-rocks
+  "Debug function to print some rocks"
   [rocks]
   (let [min-y (apply min (map second rocks))]
     (loop [y (apply max (map second rocks))]
@@ -158,16 +167,6 @@
     rocks))
 
 (comment
-  (float (/ 353185 2022))
-  (-> (place-rocks 2022 (str/trim (slurp "resources/day_17.txt")))
-      #_(print-rocks)
-      height)
   (->> (slurp "resources/day_17.txt")
        (str/trim)
-       (quick-compute-height-at-level  1000000000000))
-  (->> (slurp "resources/day_17.txt")
-       (str/trim)
-       (place-rocks 1000000000000)
-       #_(print-rocks)
-       height)
-  )
+       (quick-compute-height-at-level 1000000000000)))

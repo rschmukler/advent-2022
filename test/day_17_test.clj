@@ -1,6 +1,6 @@
 (ns day-17-test
   (:require [day-17 :as sut]
-            [clojure.test :refer [deftest testing is]]))
+            [clojure.test :refer [deftest is]]))
 
 (def jet-stream
   ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>")
@@ -32,54 +32,3 @@
          (sut/quick-compute-height-at-level
            1000000000000
            jet-stream))))
-
-(comment
-  (->> (sut/rock-placements jet-stream)
-       (map-indexed vector)
-       (rest)
-       (keep #(when (zero? (rem (first %) 200))
-                (sut/height (second %))))
-       (take 22)
-       (reverse)
-       (partition 2 1)
-       (map #(apply - %))))
-
-
-(defn find-cycle
-  [items]
-  (loop [offset 1
-         s      (rest items)]
-    (cond
-      (= (take 5 s)
-         (take 5 items)) offset
-      (> offset 100000)  nil
-      :else
-      (recur (inc offset) (rest s)))))
-
-(find-cycle
-  (cycle "abcdefghijk"))
-
-(comment
-  (sut/find-cycle
-    (->> (sut/rock-placements jet-stream)
-         (rest)
-         (map sut/height)
-         (partition 2 1)
-         (map #(- (second %) (first %)))))
-
-  (->> (sut/rock-placements jet-stream)
-       (rest)
-       (take 4200)
-       (last)
-       (sut/height))
-  (let [height-diffs (->> (sut/rock-placements jet-stream)
-                          (rest)
-                          (map sut/height)
-                          (partition 2 1)
-                          (map #(- (second %) (first %)))
-                          (take 50000))
-        offset       1
-        s            (drop offset height-diffs)]
-    [(take 10 height-diffs)
-     (take 10 s)])
-  )
